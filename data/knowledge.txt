@@ -1,0 +1,33 @@
+# Python Basics Knowledge Base
+
+## 1. Variables in Python
+
+Variables are names used to store or reference values in Python. A variable is created when a value is assigned to it using the equals sign (`=`). For example, `name = "Alice"` stores a string value, while `age = 25` stores an integer. Python is dynamically typed, which means you do not need to declare a variable's type explicitly. The type is determined by the value assigned to the variable.
+
+## 2. Common Data Types
+
+Python provides several built-in data types. A string (`str`) represents text, an integer (`int`) represents whole numbers, and a float (`float`) represents decimal numbers. A Boolean (`bool`) stores either `True` or `False`. A list stores an ordered collection of items and can be modified after creation. A tuple is also ordered but cannot be modified. A dictionary (`dict`) stores data as key-value pairs, while a set stores unique values without guaranteeing a particular order.
+
+## 3. Functions and Parameters
+
+Functions are reusable blocks of code that perform specific tasks. A function is defined using the `def` keyword, followed by its name and parentheses. Parameters allow a function to receive input values. For example, a function that adds two numbers can accept two parameters and return their sum using the `return` statement. Functions help organize code, reduce repetition, and make programs easier to test and maintain.
+
+## 4. Modules and Imports
+
+A module is a Python file containing reusable code, such as functions, classes, and variables. The `import` statement allows one Python file to use functionality defined in another module. For example, `import os` imports the `os` module, which provides tools for interacting with the operating system. You can also import specific functions or variables using syntax such as `from math import sqrt`. Organizing code into modules makes larger projects easier to understand and maintain.
+
+## 5. Exceptions and Error Handling
+
+Exceptions are errors or unusual conditions that occur while a program is running. Python uses `try` and `except` blocks to handle exceptions without immediately terminating the program. Code that might fail is placed inside the `try` block, while the `except` block defines what to do if a particular exception occurs. The `finally` block can be used for cleanup operations that should run whether an exception occurs or not. Common exceptions include `ValueError`, `TypeError`, `FileNotFoundError`, and `ZeroDivisionError`.
+
+## 6. Reading Files in Python
+
+Python provides the built-in `open()` function for working with files. The read mode (`"r"`) opens an existing file for reading, while the write mode (`"w"`) creates or overwrites a file. The `with` statement is recommended because it automatically closes the file after the operation finishes. For example, reading a text file allows a program to load its contents into a string for further processing. File handling is useful when building applications that work with documents or local knowledge bases.
+
+## 7. Lists and Loops
+
+Lists allow Python programs to store multiple items in a single variable. Individual elements can be accessed using zero-based indexing, so the first element has index `0`. A `for` loop can iterate over the elements of a list and perform an operation on each item. Lists can be modified using methods such as `append()`, `remove()`, and `sort()`. In document processing, lists are useful for storing text chunks, search results, and collections of retrieved information.
+
+## 8. Dictionaries and Structured Data
+
+Dictionaries store information using key-value pairs. Each key is used to access its associated value. For example, a dictionary representing a document might contain a filename, document text, and creation date. Values can be retrieved using their keys, and new key-value pairs can be added or existing values updated. Dictionaries are useful in AI applications because they can represent structured information, document metadata, API responses, and configuration settings.
