@@ -1,19 +1,25 @@
-import os
-import sys
+from document_loader import load_document
+from text_chunker import split_text
 
-from dotenv import load_dotenv
+CHUNK_SIZE = 500
 
-load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_DEFAULT_MODEL = os.getenv("OPENAI_DEFAULT_MODEL")
+def main():
+    doc = load_document()
+    chunk_details = split_text(doc, CHUNK_SIZE)
 
-if not OPENAI_API_KEY:
-    print("Error: OPENAI_API_KEY is missing. Please configure it in your .env file.")
-    sys.exit(1)
+    print(f"Total characters in document: {len(doc)}")
+    print(f"Chunk size: {CHUNK_SIZE}")
+    print(f"Total number of chunks: {len(chunk_details)}")
 
-if not OPENAI_DEFAULT_MODEL:
-    print(
-        "Error: OPENAI_DEFAULT_MODEL is missing. Please configure it in your .env file."
-    )
-    sys.exit(1)
+    if chunk_details:
+        print(f"First chunk length: {len(chunk_details[0])}")
+        print("First 100 characters of the first chunk:")
+        print(chunk_details[0][:100])
+        print(f"Last chunk length: {len(chunk_details[-1])}")
+    else:
+        print("No chunks were created.")
+
+
+if __name__ == "__main__":
+    main()
