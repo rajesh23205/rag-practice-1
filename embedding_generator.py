@@ -4,14 +4,17 @@ from openai import OpenAI
 # Load the API key from the .env file.
 load_dotenv()
 
+# Define the embedding model in one place.
+EMBEDDING_MODEL = "text-embedding-3-small"
+
 # Create the OpenAI client.
 client = OpenAI()
 
 
 def generate_embedding(text):
-    # Generate an embedding.
+    # Generate an embedding using the configured model.
     response = client.embeddings.create(
-        model="text-embedding-3-small",
+        model=EMBEDDING_MODEL,
         input=text,
     )
 
@@ -24,5 +27,6 @@ if __name__ == "__main__":
     text = "Python is useful for building AI applications."
     embedding = generate_embedding(text)
     print("Original text:", text)
+    print("Embedding model:", EMBEDDING_MODEL)
     print("Number of dimensions:", len(embedding))
     print("First 10 numbers:", embedding[:10])

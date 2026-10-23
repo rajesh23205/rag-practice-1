@@ -1,18 +1,22 @@
+import json
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
 from document_loader import load_document
-from embedding_generator import generate_embedding
+from embedding_generator import EMBEDDING_MODEL, generate_embedding
+from query_rewriter import rewrite_query
 from similarity import cosine_similarity
 from text_chunker import split_text
 
-# Load environment variables from .env.
+# Load environment variables and create the OpenAI client.
 load_dotenv()
-
-# Create the OpenAI client.
 client = OpenAI()
+
+MODEL = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-5-nano")
+CACHE_FILE = Path("data/embedding_cache.json")
 
 
 # Configuration
@@ -22,11 +26,47 @@ TOP_K = 3
 SIMILARITY_THRESHOLD = 0.3
 
 
+def load_embedding_cache():
+    if not CACHE_FILE.exists():
+        return {}
+
+    with CACHE_FILE.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def save_embedding_cache(cache):
+    with CACHE_FILE.open("w", encoding="utf-8") as file:
+        json.dump(cache, file)
+
+
+def get_embedding(text, cache):
+    # Identify the embedding using both model and text.
+    cache_key = f"{EMBEDDING_MODEL}::{text}"
+
+    # Check for the new model-aware cache key.
+    if cache_key in cache:
+        print("Cache HIT: Reusing saved embedding.")
+        return cache[cache_key]
+
+    # Migrate an existing entry from the old cache format.
+    if text in cache:
+        print("Cache HIT: Migrating existing embedding.")
+        embedding = cache.pop(text)
+        cache[cache_key] = embedding
+        return embedding
+
+    # Generate an embedding if no matching entry exists.
+    print("Cache MISS: Generating new embedding.")
+    embedding = generate_embedding(text)
+    cache[cache_key] = embedding
+
+    return embedding
+
+
 def main():
-    # Step 1: Load the knowledge document.
+    # Step 1: Load and prepare the knowledge base.
     doc = load_document()
 
-    # Step 2: Split the document into chunks.
     chunk_details = split_text(
         doc,
         chunk_size=CHUNK_SIZE,
@@ -37,88 +77,114 @@ def main():
         print("No chunks were created.")
         return
 
-    # Step 3: Generate an embedding for each chunk.
+    # Step 2: Load cached embeddings.
+    embedding_cache = load_embedding_cache()
+
+    # Generate embeddings only for chunks not already cached.
     chunk_embeddings = []
 
     for chunk in chunk_details:
-        embedding = generate_embedding(chunk)
+        embedding = get_embedding(chunk, embedding_cache)
         chunk_embeddings.append(embedding)
 
-    # Step 4: Generate an embedding for the user's question.
-    question = input("\nEnter your question: ").strip()
+    # Save newly generated embeddings.
+    save_embedding_cache(embedding_cache)
 
-    if not question:
-        print("Please enter a question.")
-        return
-    question_embedding = generate_embedding(question)
+    # Step 3: Create memory for this conversation session.
+    conversation_history = []
 
-    # Step 5: Calculate similarity between the question
-    # embedding and each chunk embedding.
-    scores = []
+    print("\nAI Knowledge Assistant")
+    print("Ask questions about your knowledge base.")
+    print("Type 'exit' to end the session.")
 
-    for index, chunk_embedding in enumerate(chunk_embeddings):
-        score = cosine_similarity(
-            question_embedding,
-            chunk_embedding,
+    # Step 4: Keep accepting questions.
+    while True:
+        question = input("\nYou: ").strip()
+
+        if not question:
+            print("Please enter a question.")
+            continue
+
+        if question.lower() in ("exit", "quit"):
+            print("Session ended.")
+            break
+
+        # Step 5: Rewrite the question using conversation history.
+        search_query = rewrite_query(
+            question=question,
+            conversation_history=conversation_history,
+            client=client,
+            model=MODEL,
         )
 
-        # Keep chunks that pass the similarity threshold.
-        if score > SIMILARITY_THRESHOLD:
-            scores.append((score, index))
+        print(f"Search query: {search_query}")
 
-    if not scores:
-        print("No information available")
-        return
+        # Step 6: Generate an embedding for the search query.
+        question_embedding = generate_embedding(search_query)
 
-    # Step 6: Sort by similarity, highest first.
-    scores.sort(reverse=True)
+        # Step 7: Find relevant chunks.
+        scores = []
 
-    # Step 7: Retrieve and display the top matching chunks.
-    top_results = scores[:TOP_K]
+        for index, chunk_embedding in enumerate(chunk_embeddings):
+            score = cosine_similarity(
+                question_embedding,
+                chunk_embedding,
+            )
 
-    print(f"\nQuestion: {question}")
-    print(f"Total chunks: {len(chunk_details)}")
-    print(f"Showing top {len(top_results)} results")
+            if score > SIMILARITY_THRESHOLD:
+                scores.append((score, index))
 
-    for rank, (score, index) in enumerate(top_results, start=1):
-        print(f"\n{'=' * 50}")
-        print(f"Rank: {rank}")
-        print(f"Similarity score: {score:.4f}")
-        print(f"Chunk index: {index}")
-        print(f"{'=' * 50}")
-        print(chunk_details[index])
+        # Step 8: Sort scores and select the top matching chunks.
+        scores.sort(reverse=True)
+        top_results = scores[:TOP_K]
 
-    # Step 8: Build context from the retrieved chunks.
-    context = "\n\n".join(chunk_details[index] for score, index in top_results)
+        # Step 9: Build context from the retrieved chunks.
+        if top_results:
+            context = "\n\n".join(chunk_details[index] for score, index in top_results)
+        else:
+            context = (
+                "No relevant knowledge-base chunks were retrieved. "
+                "Use the conversation history if it contains enough "
+                "information to answer the question."
+            )
 
-    # Step 9: Generate an answer using the retrieved context.
-    response = client.responses.create(
-        model=os.getenv("OPENAI_DEFAULT_MODEL", "gpt-5-nano"),
-        instructions=(
-            "Answer the user's question using only the provided context. "
-            "Explain the answer clearly and simply. "
-            "If the context does not contain enough information, "
-            "say that the knowledge base does not contain enough "
-            "information to answer the question."
-        ),
-        input=(f"Context:\n{context}\n\nQuestion:\n{question}"),
-    )
+        # Step 10: Format the previous conversation.
+        history_text = ""
 
-    # Step 10: Display the generated answer.
-    print(f"\n{'=' * 50}")
-    print("Generated Answer")
-    print(f"{'=' * 50}")
-    print(response.output_text)
+        for turn in conversation_history:
+            history_text += f"User: {turn['question']}\nAssistant: {turn['answer']}\n\n"
 
-    # Step 11: Display summary information.
-    print(f"\n{'=' * 50}")
-    print("Pipeline Summary")
-    print(f"{'=' * 50}")
-    print(f"Total characters: {len(doc)}")
-    print(f"Total chunks: {len(chunk_details)}")
-    print(f"Chunk size: {CHUNK_SIZE}")
-    print(f"Total embeddings: {len(chunk_embeddings)}")
-    print(f"Embedding dimensions: {len(chunk_embeddings[0])}")
+        # Step 11: Generate an answer using context and history.
+        response = client.responses.create(
+            model=MODEL,
+            instructions=(
+                "You are a helpful knowledge assistant. "
+                "Use the retrieved context to answer questions "
+                "about the knowledge base. Use conversation history "
+                "to understand follow-up questions and references "
+                "to earlier messages. Do not invent facts that are "
+                "not supported by the context or conversation history. "
+                "If there is not enough information, say so."
+            ),
+            input=(
+                f"Conversation history:\n{history_text}\n"
+                f"Retrieved context:\n{context}\n\n"
+                f"Current question:\n{question}"
+            ),
+        )
+
+        answer = response.output_text
+
+        # Step 12: Display the answer.
+        print(f"\nAssistant: {answer}")
+
+        # Step 13: Save this exchange in session memory.
+        conversation_history.append(
+            {
+                "question": question,
+                "answer": answer,
+            }
+        )
 
 
 if __name__ == "__main__":
