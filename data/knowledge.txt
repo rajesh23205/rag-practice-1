@@ -31,3 +31,4 @@ Lists allow Python programs to store multiple items in a single variable. Indivi
 ## 8. Dictionaries and Structured Data
 
 Dictionaries store information using key-value pairs. Each key is used to access its associated value. For example, a dictionary representing a document might contain a filename, document text, and creation date. Values can be retrieved using their keys, and new key-value pairs can be added or existing values updated. Dictionaries are useful in AI applications because they can represent structured information, document metadata, API responses, and configuration settings.
+Python supports reusable functions.
