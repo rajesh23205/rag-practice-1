@@ -31,11 +31,22 @@ collection.upsert(
     ],
 )
 
-collection.delete(ids=["test_1"])
+collection.upsert(
+    ids=["test_2"],
+    documents=["JavaScript supports reusable functions."],
+    embeddings=[[0.4, 0.5, 0.6]],
+    metadatas=[
+        {
+            "source": "javascript.txt",
+            "topic": "functions",
+        }
+    ],
+)
+
+collection.delete(where={"source": "test_document.txt"})
 
 print(
     collection.get(
-        where={"source": "test_document.txt"},
         include=["documents", "metadatas"],
     )
 )

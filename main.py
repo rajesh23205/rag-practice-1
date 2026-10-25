@@ -82,7 +82,7 @@ def main():
         search_results = collection.query(
             query_embeddings=[question_embedding],
             n_results=min(collection.count(), max(TOP_K, 10)),
-            include=["documents", "distances"],
+            include=["documents", "distances", "metadatas"],
         )
 
         # Step 8: Filter results by cosine similarity.
@@ -91,31 +91,45 @@ def main():
         result_ids = search_results["ids"][0]
         result_documents = search_results["documents"][0]
         result_distances = search_results["distances"][0]
+        result_metadatas = search_results["metadatas"][0]
 
-        for chunk_id, document, distance in zip(
+        for chunk_id, document, distance, metadata in zip(
             result_ids,
             result_documents,
             result_distances,
+            result_metadatas,
         ):
             score = 1 - distance
 
             if score > SIMILARITY_THRESHOLD:
-                scores.append((score, chunk_id, document))
+                source = metadata["source"]
+                scores.append((score, chunk_id, document, source))
 
         # Step 9: Select the top matching chunks.
         scores.sort(key=lambda result: result[0], reverse=True)
         top_results = scores[:TOP_K]
 
+        if not top_results:
+            print(
+                "\nAssistant: I couldn't find relevant information "
+                "in the knowledge base to answer that question."
+            )
+            continue
+
         print("\nRetrieved chunks:")
 
-        for score, chunk_id, document in top_results:
+        for score, chunk_id, document, source in top_results:
             print(f"\nSimilarity: {score:.4f}")
             print(f"Chunk ID: {chunk_id}")
+            print(f"Source: {source}")
             print(document)
 
         # Step 10: Build context from the retrieved documents.
         if top_results:
-            context = "\n\n".join(document for score, chunk_id, document in top_results)
+            context = "\n\n".join(
+                f"Source: {source}\n{document}"
+                for score, chunk_id, document, source in top_results
+            )
         else:
             context = (
                 "No relevant knowledge-base chunks were retrieved. "
@@ -139,7 +153,9 @@ def main():
                 "to understand follow-up questions and references "
                 "to earlier messages. Do not invent facts that are "
                 "not supported by the context or conversation history. "
-                "If there is not enough information, say so."
+                "If there is not enough information, say so. "
+                "When using information from the retrieved context, "
+                "cite the relevant source filename in your answer."
             ),
             input=(
                 f"Conversation history:\n{history_text}\n"

@@ -13,19 +13,29 @@ from text_chunker import split_text
 
 CHUNK_SIZE = 500
 OVERLAP_SIZE = 50
-HASH_FILE = Path("data/knowledge_hash.txt")
 
 
-def main():
+def get_hash_file_path(filename: str) -> Path:
+    return Path("data/hashes") / f"{filename}.hash"
+
+
+def main(filename: str):
     # Step 1: Load the knowledge document.
-    document = load_document()
+    document = load_document(filename)
+    hash_file = get_hash_file_path(filename)
+
+    chunks = split_text(
+        document,
+        chunk_size=CHUNK_SIZE,
+        overlap_size=OVERLAP_SIZE,
+    )
 
     document_hash = hashlib.sha256(document.encode("utf-8")).hexdigest()
 
     print("Document hash:", document_hash)
 
-    if HASH_FILE.exists():
-        previous_hash = HASH_FILE.read_text(encoding="utf-8").strip()
+    if hash_file.exists():
+        previous_hash = hash_file.read_text(encoding="utf-8").strip()
     else:
         previous_hash = None
 
@@ -40,7 +50,11 @@ def main():
             configuration={"hnsw": {"space": "cosine"}},
         )
 
-        if collection.count() > 0:
+        expected_ids = [f"{filename}_chunk_{index}" for index in range(len(chunks))]
+
+        existing_chunks = collection.get(where={"source": filename})
+
+        if set(existing_chunks["ids"]) == set(expected_ids):
             print("Knowledge base unchanged. Skipping indexing.")
             return
 
@@ -71,18 +85,15 @@ def main():
     )
 
     # Step 5: Replace the existing index with the current chunks.
-    existing_ids = collection.get()["ids"]
-
-    if existing_ids:
-        collection.delete(ids=existing_ids)
+    collection.delete(where={"source": filename})
 
     collection.upsert(
-        ids=[f"chunk_{index}" for index in range(len(chunks))],
+        ids=[f"{filename}_chunk_{index}" for index in range(len(chunks))],
         documents=chunks,
         embeddings=embeddings,
         metadatas=[
             {
-                "source": "knowledge.txt",
+                "source": filename,
                 "chunk_index": index,
             }
             for index in range(len(chunks))
@@ -93,8 +104,8 @@ def main():
     save_embedding_cache(embedding_cache)
 
     # Save the hash of the successfully indexed document.
-    HASH_FILE.parent.mkdir(parents=True, exist_ok=True)
-    HASH_FILE.write_text(document_hash, encoding="utf-8")
+    hash_file.parent.mkdir(parents=True, exist_ok=True)
+    hash_file.write_text(document_hash, encoding="utf-8")
 
     print(collection.get(limit=2, include=["metadatas"]))
 
@@ -103,4 +114,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main("knowledge.txt")
+    main("javascript.txt")

@@ -1,0 +1,2 @@
+JavaScript is a programming language commonly used for web development.
+JavaScript supports functions and asynchronous programming.

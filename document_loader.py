@@ -1,9 +1,9 @@
 from pathlib import Path
 
 
-def load_document() -> str:
+def load_document(filename: str = "knowledge.txt") -> str:
     """Load the knowledge document and return its text."""
-    file_path = Path(__file__).parent / "data" / "knowledge.txt"
+    file_path = Path(__file__).parent / "data" / filename
 
     if not file_path.exists():
         raise FileNotFoundError(f"Knowledge document not found: {file_path}")
@@ -21,7 +21,7 @@ def load_document() -> str:
 
 if __name__ == "__main__":
     try:
-        text = load_document()
+        text = load_document("knowledge.txt")
 
         print("Document loaded successfully!")
         print(f"Total characters: {len(text)}")
